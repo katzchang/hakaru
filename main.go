@@ -5,16 +5,23 @@ import (
 	"log"
 
 	"database/sql"
-
 	_ "github.com/go-sql-driver/mysql"
 	"os"
+	"encoding/json"
 )
+
+type Event struct {
+	Name string `json:"name"`
+	Value interface{} `json:"value"`
+}
+
 
 func main() {
 	dataSourceName := os.Getenv("HAKARU_DATASOURCENAME")
 	if dataSourceName == "" {
 		dataSourceName = "root:password@tcp(127.0.0.1:13306)/hakaru"
 	}
+    logger := log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 	hakaruHandler := func(w http.ResponseWriter, r *http.Request) {
 		db, err := sql.Open("mysql", dataSourceName)
@@ -32,6 +39,13 @@ func main() {
 
 		name := r.URL.Query().Get("name")
 		value := r.URL.Query().Get("value")
+
+		bytes, _ := json.Marshal(Event{
+			Name: name,
+			Value: value,
+		})
+		logger.Println(string(bytes))
+
 
 		_, _ = stmt.Exec(name, value)
 

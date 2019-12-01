@@ -29,23 +29,7 @@ build: test
 clean:
 	rm -rf hakaru *.tgz
 
-# lcoal mysqld on docker
-
-mysql_run:
-	docker run --rm -d \
-	  --name sunrise2019-hakaru-db \
-	  -e MYSQL_ROOT_PASSWORD=password \
-	  -e MYSQL_DAATBASE=hakaru \
-	  -e TZ=Asia/Tokyo \
-	  -p 13306:3306 \
-	  -v $(CURDIR)/db/data:/var/lib/mysql \
-	  -v $(CURDIR)/db/my.cnf:/etc/mysql/conf.d/my.cnf:ro \
-	  -v $(CURDIR)/db/init:/docker-entrypoint-initdb.d:ro \
-	  mysql:5.6 \
-	  mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-
 # deployment
-
 artifacts.tgz: provisioning/instance
 	$(MAKE) build GOOS=linux GOARCH=amd64
 	tar czf artifacts.tgz hakaru db provisioning/instance
