@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"log"
 
@@ -8,6 +9,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"os"
 	"encoding/json"
+
+	"cloud.google.com/go/trace/apiv2"
 )
 
 type Event struct {
@@ -17,6 +20,20 @@ type Event struct {
 
 
 func main() {
+	ctx := context.Background()
+	_, _ = trace.NewClient(ctx)
+	//if err != nil {
+	//	// TODO: Handle error.
+	//}
+	//
+	//req := &cloudtracepb.BatchWriteSpansRequest{
+	//	// TODO: Fill request struct fields.
+	//}
+	//err = c.BatchWriteSpans(ctx, req)
+	//if err != nil {
+	//	// TODO: Handle error.
+	//}
+
 	dataSourceName := os.Getenv("HAKARU_DATASOURCENAME")
 	if dataSourceName == "" {
 		dataSourceName = "root:password@tcp(127.0.0.1:13306)/hakaru"
