@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"net/http"
 	"log"
 
@@ -10,38 +9,41 @@ import (
 	"os"
 	"encoding/json"
 
-	"cloud.google.com/go/trace/apiv2"
+	"contrib.go.opencensus.io/integrations/ocsql"
+	"go.opencensus.io/plugin/ochttp"
+	"go.opencensus.io/trace"
+	"contrib.go.opencensus.io/exporter/stackdriver"
+
 )
 
 type Event struct {
-	Name string `json:"name"`
+	Name  string      `json:"name"`
 	Value interface{} `json:"value"`
 }
 
-
 func main() {
-	ctx := context.Background()
-	_, _ = trace.NewClient(ctx)
-	//if err != nil {
-	//	// TODO: Handle error.
-	//}
-	//
-	//req := &cloudtracepb.BatchWriteSpansRequest{
-	//	// TODO: Fill request struct fields.
-	//}
-	//err = c.BatchWriteSpans(ctx, req)
-	//if err != nil {
-	//	// TODO: Handle error.
-	//}
+	// Create and register a OpenCensus Stackdriver Trace exporter.
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{
+		ProjectID: os.Getenv("GOOGLE_CLOUD_PROJECT"),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	trace.RegisterExporter(exporter)
 
 	dataSourceName := os.Getenv("HAKARU_DATASOURCENAME")
 	if dataSourceName == "" {
 		dataSourceName = "root:password@tcp(127.0.0.1:13306)/hakaru"
 	}
-    logger := log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
+	logger := log.New(os.Stdout, "", log.LstdFlags|log.Lmicroseconds|log.Lshortfile)
 
 	hakaruHandler := func(w http.ResponseWriter, r *http.Request) {
-		db, err := sql.Open("mysql", dataSourceName)
+		driverName, err := ocsql.Register("mysql", ocsql.WithAllTraceOptions())
+		if err != nil {
+			log.Fatalf("Failed to register the ocsql driver: %v", err)
+		}
+
+		db, err := sql.Open(driverName, dataSourceName)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -58,11 +60,10 @@ func main() {
 		value := r.URL.Query().Get("value")
 
 		bytes, _ := json.Marshal(Event{
-			Name: name,
+			Name:  name,
 			Value: value,
 		})
 		logger.Println(string(bytes))
-
 
 		_, _ = stmt.Exec(name, value)
 
@@ -77,8 +78,12 @@ func main() {
 		w.Header().Set("Access-Control-Allow-Methods", "GET")
 	}
 
-	http.HandleFunc("/hakaru", hakaruHandler)
-	http.HandleFunc("/ok", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) })
+	http.Handle("/hakaru", &ochttp.Handler{
+		Handler: http.HandlerFunc(hakaruHandler),
+	})
+	http.Handle("/ok", &ochttp.Handler{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }),
+	})
 
 	// start server
 	if err := http.ListenAndServe(":8081", nil); err != nil {
